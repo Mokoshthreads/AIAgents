@@ -1,0 +1,280 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Slavic Mythological Character Creator</title>
+
+    <style>
+      body {
+        font-family: "Georgia", "Times New Roman", serif;
+        max-width: 680px;
+        margin: 60px auto;
+        padding: 40px;
+
+        background: radial-gradient(circle at top, #2b2a25, #141310);
+        color: #e6e1d6;
+        border: 1px solid #3a372f;
+        box-shadow: 0 0 40px rgba(0,0,0,0.7);
+      }
+
+      h2 {
+        text-align: center;
+        font-size: 32px;
+        letter-spacing: 1px;
+        margin-bottom: 30px;
+        color: #f1e6c8;
+      }
+
+      h3 {
+        margin-top: 30px;
+        margin-bottom: 10px;
+        font-size: 20px;
+        color: #d6c9a3;
+        border-bottom: 1px solid #3f3b30;
+        padding-bottom: 6px;
+      }
+
+      input[type="file"] {
+        margin-top: 12px;
+        font-size: 15px;
+        color: #d6c9a3;
+      }
+
+      .packs button,
+      .no-image button {
+        margin: 8px 6px 0 0;
+        padding: 14px 18px;
+        cursor: pointer;
+
+        font-family: "Georgia", serif;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+
+        background: linear-gradient(#3b372c, #26241e);
+        color: #e6e1d6;
+
+        border: 1px solid #5a533f;
+        box-shadow: inset 0 0 8px rgba(0,0,0,0.6);
+        transition: all 0.2s ease;
+      }
+
+      .packs button:hover,
+      .no-image button:hover {
+        background: linear-gradient(#4a4434, #2f2b22);
+      }
+
+      .selected {
+        background: linear-gradient(#6b5a2b, #4b3f1f) !important;
+        border-color: #c8a95a;
+        color: #fff6d5;
+        box-shadow: 0 0 12px rgba(200,169,90,0.5);
+      }
+
+      button#send {
+        display: block;
+        margin: 40px auto 0;
+        padding: 16px 36px;
+
+        font-size: 18px;
+        letter-spacing: 1px;
+        font-family: "Georgia", serif;
+
+        background: linear-gradient(#7a5f2b, #4e3d1b);
+        color: #fff2c2;
+
+        border: 1px solid #d1b56b;
+        cursor: pointer;
+        box-shadow: 0 0 16px rgba(0,0,0,0.7);
+      }
+
+      button#send:hover {
+        background: linear-gradient(#8b6d33, #5a4620);
+      }
+
+      button#send:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      /* --- Preview box (new) --- */
+      .preview {
+        margin-top: 22px;
+        padding: 16px;
+        background: #1a1915;
+        border: 1px solid #3a372f;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.55);
+        display: none;
+      }
+
+      .preview .status {
+        color: #d6c9a3;
+        font-size: 15px;
+        letter-spacing: 0.5px;
+      }
+
+      .preview img {
+        width: 100%;
+        margin-top: 12px;
+        border: 1px solid #5a533f;
+        box-shadow: 0 0 18px rgba(0,0,0,0.8);
+        display: none;
+      }
+
+      pre#out {
+        margin-top: 30px;
+        padding: 14px;
+        background: #1a1915;
+        border: 1px solid #3a372f;
+        color: #cfc6ad;
+        font-size: 13px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h2>Create Your Own Slavic Mythological Character</h2>
+
+    <h3>Upload your image (Optional)</h3>
+    <input type="file" id="image" accept="image/*" />
+
+    <div class="no-image">
+      <button type="button" id="noImageBtn">
+        I don’t want to use an image
+      </button>
+    </div>
+
+    <h3>Choose a Mythic Pack</h3>
+
+    <div class="packs">
+      <button type="button" data-value="1">Thrones of the Old Gods</button>
+      <button type="button" data-value="2">Oaths of Crown and Sword</button>
+      <button type="button" data-value="3">Whispers of Hearth & Forest</button>
+      <button type="button" data-value="4">Veils of Sorcery</button>
+      <button type="button" data-value="5">Fangs of Myth & Oath</button>
+    </div>
+
+    <button id="send">Invoke the Ritual</button>
+
+    <!-- Preview screen (new) -->
+    <div class="preview" id="previewBox">
+      <div class="status" id="previewStatus">The ritual is underway…</div>
+      <img id="previewImage" alt="Generated mythic image preview" />
+    </div>
+
+    <pre id="out"></pre>
+
+    <script>
+      const WEBHOOK_URL = "http://localhost:5678/webhook-test/pack-id";
+
+      let selectedPack = null;
+      let noImageSelected = false;
+
+      const sendBtn = document.getElementById("send");
+      const previewBox = document.getElementById("previewBox");
+      const previewStatus = document.getElementById("previewStatus");
+      const previewImage = document.getElementById("previewImage");
+      const out = document.getElementById("out");
+
+      // Prevent memory build-up if user generates many times
+      let lastObjectUrl = null;
+
+      document.querySelectorAll(".packs button").forEach(btn => {
+        btn.addEventListener("click", () => {
+          selectedPack = btn.dataset.value;
+
+          document.querySelectorAll(".packs button")
+            .forEach(b => b.classList.remove("selected"));
+
+          btn.classList.add("selected");
+        });
+      });
+
+      document.getElementById("noImageBtn").addEventListener("click", () => {
+        noImageSelected = true;
+        document.getElementById("noImageBtn").classList.add("selected");
+        document.getElementById("image").value = "";
+      });
+
+      document.getElementById("image").addEventListener("change", () => {
+        if (document.getElementById("image").files.length > 0) {
+          noImageSelected = false;
+          document.getElementById("noImageBtn").classList.remove("selected");
+        }
+      });
+
+      function showLoadingPreview() {
+        previewBox.style.display = "block";
+        previewStatus.textContent = "The ritual is underway…";
+        previewImage.style.display = "none";
+        previewImage.src = "";
+
+        // Clean up previous blob URL
+        if (lastObjectUrl) {
+          URL.revokeObjectURL(lastObjectUrl);
+          lastObjectUrl = null;
+        }
+      }
+
+      document.getElementById("send").addEventListener("click", async () => {
+        const file = document.getElementById("image").files[0];
+
+        if (!selectedPack) {
+          alert("Choose a mythic pack.");
+          return;
+        }
+
+        if (!file && !noImageSelected) {
+          alert("Upload an image or renounce it.");
+          return;
+        }
+
+        const fd = new FormData();
+        fd.append("pack_id", selectedPack);
+
+        if (file) {
+          fd.append("image", file);
+        } else {
+          fd.append("no_image", "true");
+        }
+
+        // UI state
+        out.textContent = "";
+        showLoadingPreview();
+        sendBtn.disabled = true;
+
+        try {
+          const res = await fetch(WEBHOOK_URL, {
+            method: "POST",
+            body: fd
+          });
+
+          const contentType = res.headers.get("content-type") || "";
+
+          // ✅ If n8n returns an image as binary (recommended)
+          if (contentType.startsWith("image/")) {
+            const blob = await res.blob();
+            lastObjectUrl = URL.createObjectURL(blob);
+
+            previewImage.src = lastObjectUrl;
+            previewImage.style.display = "block";
+            previewStatus.textContent = "Ritual complete.";
+            out.textContent = "Received image binary response.";
+            return;
+          }
+
+          // Fallback: show text response
+          const text = await res.text();
+          previewStatus.textContent =
+            "Ritual finished, but no image was returned. See output below.";
+          out.textContent = text;
+        } catch (err) {
+          previewStatus.textContent = "The ritual failed. See error below.";
+          out.textContent = String(err);
+        } finally {
+          sendBtn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
